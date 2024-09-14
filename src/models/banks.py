@@ -1,7 +1,15 @@
 import random
 from enum import Flag, auto
 
-from sqlalchemy import String, ForeignKey, Enum, Date, create_engine, select
+from sqlalchemy import (
+    String,
+    ForeignKey,
+    Enum,
+    Date,
+    create_engine,
+    select,
+    PrimaryKeyConstraint,
+)
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
@@ -12,13 +20,21 @@ from sqlalchemy.orm import (
 from src.models.models import WithPK, PersonModel, Base
 
 
-class BankUser(WithPK):
-    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"))
-    bank_id: Mapped[int] = mapped_column(ForeignKey("bank.id"))
+class BankUser(Base):
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), primary_key=True)
+    bank_id: Mapped[int] = mapped_column(ForeignKey("bank.id"), primary_key=True)
+
+    # __table_args__ = (PrimaryKeyConstraint("user_id", "bank_id"),)
 
 
 class Bank(WithPK):
     name: Mapped[str] = mapped_column(String(100), unique=True)
+    users: Mapped[list["User"]] = relationship(
+        back_populates="banks",
+        # default_factory=list,
+        secondary="bank_user",
+        # lazy="joined",
+    )
     rating: Mapped[int] = mapped_column(
         default_factory=lambda: random.randint(0, 100), init=False
     )
@@ -27,19 +43,13 @@ class Bank(WithPK):
     )
 
     atms: Mapped[list["BankAtm"]] = relationship(
-        back_populates="bank", default_factory=list, lazy="selectin"
+        back_populates="bank", default_factory=list, lazy="joined"
     )
     offices: Mapped[list["BankOffice"]] = relationship(
-        back_populates="bank", default_factory=list, lazy="selectin"
+        back_populates="bank", default_factory=list, lazy="joined"
     )
     employees: Mapped[list["Employee"]] = relationship(
-        back_populates="bank", default_factory=list, lazy="selectin"
-    )
-    users: Mapped[list["User"]] = relationship(
-        back_populates="banks",
-        default_factory=list,
-        secondary="bank_user",
-        lazy="selectin",
+        back_populates="bank", default_factory=list, lazy="joined"
     )
 
     def count_atms(self) -> int:
@@ -54,22 +64,22 @@ class Bank(WithPK):
 
 class User(WithPK, PersonModel):
     work_place: Mapped[str | None] = mapped_column(String(100))
+    banks: Mapped[list["Bank"]] = relationship(
+        back_populates="users",
+        secondary="bank_user",
+        # default_factory=list,
+        # lazy="joined",
+    )
     bank_credit_score: Mapped[int]
     monthly_income: Mapped[float] = mapped_column(
         default_factory=lambda: round(random.uniform(0.0, 10000), 2), init=False
     )
 
-    banks: Mapped[list["Bank"]] = relationship(
-        back_populates="users",
-        secondary="bank_user",
-        default_factory=list,
-        lazy="selectin",
-    )
     credit_accounts: Mapped[list["CreditAccount"]] = relationship(
-        back_populates="user", default_factory=list, lazy="selectin"
+        back_populates="user", default_factory=list, lazy="joined"
     )
     payment_accounts: Mapped[list["PaymentAccount"]] = relationship(
-        back_populates="user", default_factory=list, lazy="selectin"
+        back_populates="user", default_factory=list, lazy="joined"
     )
 
 
@@ -85,9 +95,9 @@ class Employee(WithPK, PersonModel):
     bank_id: Mapped[int] = mapped_column(ForeignKey("bank.id"), init=False)
     office_id: Mapped[int] = mapped_column(ForeignKey("bank_office.id"), init=False)
     bank: Mapped["Bank | None"] = relationship(
-        back_populates="employees", default=None, lazy="selectin"
+        back_populates="employees", default=None, lazy="joined"
     )
-    office: Mapped["BankOffice | None"] = relationship(default=None, lazy="selectin")
+    office: Mapped["BankOffice | None"] = relationship(default=None, lazy="joined")
     status: Mapped[EmployeeStatus | None] = mapped_column(
         Enum(EmployeeStatus), default=None
     )
@@ -108,12 +118,12 @@ class CreditAccount(WithPK):
         ForeignKey("payment_account.id"), init=False
     )
     user: Mapped["User | None"] = relationship(
-        back_populates="credit_accounts", default=None, lazy="selectin"
+        back_populates="credit_accounts", default=None, lazy="joined"
     )
-    bank: Mapped["Bank | None"] = relationship(default=None, lazy="selectin")
-    employee: Mapped["Employee | None"] = relationship(default=None, lazy="selectin")
+    bank: Mapped["Bank | None"] = relationship(default=None, lazy="joined")
+    employee: Mapped["Employee | None"] = relationship(default=None, lazy="joined")
     payment_account: Mapped["PaymentAccount | None"] = relationship(
-        default=None, lazy="selectin"
+        default=None, lazy="joined"
     )
 
 
@@ -123,9 +133,9 @@ class PaymentAccount(WithPK):
     user_id: Mapped[int] = mapped_column(ForeignKey("user.id"))
     bank_id: Mapped[int] = mapped_column(ForeignKey("bank.id"))
     user: Mapped["User | None"] = relationship(
-        back_populates="payment_accounts", default=None, lazy="selectin"
+        back_populates="payment_accounts", default=None, lazy="joined"
     )
-    bank: Mapped["Bank | None"] = relationship(default=None, lazy="selectin")
+    bank: Mapped["Bank | None"] = relationship(default=None, lazy="joined")
 
 
 class BankAtmStatus(Flag):
@@ -142,10 +152,10 @@ class BankAtm(WithPK):
     bank_id: Mapped[int] = mapped_column(ForeignKey("bank.id"), init=False)
     office_id: Mapped[int] = mapped_column(ForeignKey("bank_office.id"), init=False)
     office: Mapped["BankOffice | None"] = relationship(
-        back_populates="atms", default=None, lazy="selectin"
+        back_populates="atms", default=None, lazy="joined"
     )
     bank: Mapped["Bank | None"] = relationship(
-        back_populates="atms", default=None, lazy="selectin"
+        back_populates="atms", default=None, lazy="joined"
     )
 
     status: Mapped[BankAtmStatus | None] = mapped_column(
@@ -165,10 +175,10 @@ class BankOffice(WithPK):
 
     bank_id: Mapped[int] = mapped_column(ForeignKey("bank.id"), init=False)
     bank: Mapped["Bank | None"] = relationship(
-        back_populates="offices", default=None, lazy="selectin"
+        back_populates="offices", default=None
     )
     atms: Mapped[list["BankAtm"]] = relationship(
-        back_populates="office", default_factory=list, lazy="selectin"
+        back_populates="office", default_factory=list, lazy="joined"
     )
 
     status: Mapped[BankOfficeStatus | None] = mapped_column(

@@ -26,16 +26,17 @@ class SQLAlchemyAsyncRepository[TModel: Base](AsyncRepository[TModel], ABC):
         stmt = select(self.__model__).where(
             attrgetter(self.__pk_name__)(self.__model__) == pk
         )
-        return (await self._session.scalars(stmt)).one_or_none()
+        return (await self._session.scalars(stmt)).unique().one_or_none()
 
     async def get_many_by_id(self, *pk: PrimaryKey) -> Iterable[TModel]:
         stmt = select(self.__model__).where(
             attrgetter(self.__pk_name__)(self.__model__) == pk
         )
-        return (await self._session.scalars(stmt)).all()
+        return (await self._session.scalars(stmt)).unique().all()
 
     async def get_all(self) -> Iterable[TModel]:
-        return (await self._session.scalars(select(self.__model__))).all()
+        stmt = select(self.__model__)
+        return (await self._session.scalars(stmt)).unique().all()
 
     async def delete_by_id(self, pk: PrimaryKey) -> TModel | None:
         stmt = (
@@ -45,14 +46,14 @@ class SQLAlchemyAsyncRepository[TModel: Base](AsyncRepository[TModel], ABC):
         )
         print(stmt)
         result = await self._session.scalars(stmt)
-        return result.one_or_none()
+        return result.unique().one_or_none()
 
     async def delete_many_by_id(self, *pk: PrimaryKey) -> Iterable[TModel | None]:
         stmt = delete(self.__model__).where(
             attrgetter(self.__pk_name__)(self.__model__).in_(*pk)
         )
         result = await self._session.scalars(stmt)
-        return result.all()
+        return result.unique().all()
 
     async def update(self, pk: PrimaryKey, **data: dict[str, Any]) -> TModel | None:
         stmt = (
@@ -62,7 +63,7 @@ class SQLAlchemyAsyncRepository[TModel: Base](AsyncRepository[TModel], ABC):
             .returning(self.__model__)
         )
         result = await self._session.scalars(stmt)
-        return result.one_or_none()
+        return result.unique().one_or_none()
 
     async def update_many(
         self, *entities: tuple[PrimaryKey, dict[str, Any]]
@@ -75,7 +76,7 @@ class SQLAlchemyAsyncRepository[TModel: Base](AsyncRepository[TModel], ABC):
                 .values(*entity[1:])
                 .returning(self.__model__)
             )
-            r.append((await self._session.scalars(q)).one_or_none())
+            r.append((await self._session.scalars(q)).unique().one_or_none())
         await self._session.commit()
         return r
 
@@ -85,7 +86,7 @@ class BankAsyncRepository(SQLAlchemyAsyncRepository[models.Bank]):
 
     async def get_by_name(self, name: str) -> models.Bank | None:
         stmt = select(self.__model__).where(self.__model__.name == name)
-        return (await self._session.scalars(stmt)).one_or_none()
+        return (await self._session.scalars(stmt)).unique().one_or_none()
 
 
 class BankOfficeAsyncRepository(SQLAlchemyAsyncRepository[models.BankOffice]):
