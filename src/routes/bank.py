@@ -2,13 +2,14 @@ from typing import Annotated, Iterable
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from starlette import status
-from sqlalchemy import select
 
-from src.models.banks import Bank, BankOffice, BankAtm
+from src.models.banks import Bank, BankOffice
 from src.routes.dependencies import get_bank_service, get_office_service
 from src.routes.exceptions import BankNotFoundException, BankOfficeNotFoundException
+from src.routes.response_models import BankOfficeDetail
 from src.services.bank import BankService, BankOfficeService
 
 bank_route = APIRouter(prefix="/bank", tags=["Bank"])
@@ -73,7 +74,9 @@ class CreateBankOfficeWithOwnerRequest(BaseCreateBankOfficeRequest):
 
 
 @office_route.get("/{id}", status_code=status.HTTP_200_OK)
-async def get_office_by_id(service: BankOfficeServiceDepends, pk: int) -> Bank | None:
+async def get_office_by_id(
+    service: BankOfficeServiceDepends, pk: int
+) -> BankOfficeDetail | None:
     stmt = (
         select(BankOffice)
         .where(BankOffice.id == pk)
@@ -85,7 +88,7 @@ async def get_office_by_id(service: BankOfficeServiceDepends, pk: int) -> Bank |
     # result = await service.get_by_id(id)
     if result is None:
         raise BankOfficeNotFoundException()
-    return result.bank
+    return BankOfficeDetail.model_validate(result)
 
 
 @office_route.get("/", status_code=status.HTTP_200_OK)
