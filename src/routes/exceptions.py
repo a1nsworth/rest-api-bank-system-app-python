@@ -16,3 +16,7 @@ class BankNotFoundException(BaseNotFound):
 
 class BankOfficeNotFoundException(BaseNotFound):
     __message__: str = "bank office not found"
+
+
+class UserNotFoundException(BaseNotFound):
+    __message__: str = "user not found"

@@ -1,7 +1,8 @@
-from pydantic import BaseModel, ConfigDict
 from datetime import date
 
-from src.models.banks import EmployeeStatus, BankAtmStatus, BankOfficeStatus
+from pydantic import BaseModel, ConfigDict
+
+from src.models.models import EmployeeStatus, BankAtmStatus, BankOfficeStatus
 
 
 class PersonModel(BaseModel):
@@ -20,22 +21,24 @@ class Bank(BaseModel):
 
 class BankDetail(Bank):
     model_config = ConfigDict(from_attributes=True)
-    atms: list["BankAtmDetail"]
-    offices: list["BankOfficeDetail"]
-    employees: list["EmployeeDetail"]
+    users: list["User"]
+    atms: list["BankAtm"]
+    offices: list["BankOffice"]
+    employees: list["Employee"]
 
 
 class User(PersonModel):
     model_config = ConfigDict(from_attributes=True)
     work_place: str | None
     bank_credit_score: float
-    mouthly_income: float
+    monthly_income: float
 
 
 class UserDetail(User):
     model_config = ConfigDict(from_attributes=True)
-    credit_accounts: list["CreditAccountDetail"]
-    payment_accounts: list["PaymentAccountDetail"]
+    banks: list["Bank"]
+    credit_accounts: list["CreditAccount"]
+    payment_accounts: list["PaymentAccount"]
 
 
 class Employee(PersonModel):
@@ -47,8 +50,8 @@ class Employee(PersonModel):
 
 class EmployeeDetail(Employee):
     model_config = ConfigDict(from_attributes=True)
-    bank: "BankDetail | None"
-    office: "BankOfficeDetail | None"
+    bank: "Bank| None"
+    office: "BankOffice| None"
 
 
 class CreditAccount(BaseModel):
@@ -63,10 +66,10 @@ class CreditAccount(BaseModel):
 
 class CreditAccountDetail(CreditAccount):
     model_config = ConfigDict(from_attributes=True)
-    user: "UserDetail | None"
-    bank: "BankDetail | None"
-    employee: "EmployeeDetail | None"
-    payment_account: "PaymentAccountDetail | None"
+    user: "User| None"
+    bank: "Bank| None"
+    employee: "Employee| None"
+    payment_account: "PaymentAccount| None"
 
 
 class PaymentAccount(BaseModel):
@@ -76,8 +79,8 @@ class PaymentAccount(BaseModel):
 
 class PaymentAccountDetail(PaymentAccount):
     model_config = ConfigDict(from_attributes=True)
-    user: "UserDetail | None"
-    bank: "BankDetail | None"
+    user: "User| None"
+    bank: "Bank| None"
 
 
 class BankAtm(BaseModel):
@@ -89,8 +92,8 @@ class BankAtm(BaseModel):
 
 class BankAtmDetail(BankAtm):
     model_config = ConfigDict(from_attributes=True)
-    office: "BankOfficeDetail | None"
-    bank: "BankDetail | None"
+    office: "BankOffice| None"
+    bank: "Bank| None"
 
 
 class BankOffice(BaseModel):
@@ -102,5 +105,5 @@ class BankOffice(BaseModel):
 
 class BankOfficeDetail(BankOffice):
     model_config = ConfigDict(from_attributes=True)
-    bank: "BankDetail | None"
-    atms: list["BankAtmDetail"]
+    bank: "Bank | None"
+    atms: list["BankAtm"]
