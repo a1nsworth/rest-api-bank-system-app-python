@@ -90,7 +90,7 @@ class Employee(WithPK, PersonModel):
     position: Mapped[str] = mapped_column(String(30))
     salary: Mapped[int]
 
-    bank_id: Mapped[int] = mapped_column(
+    bank_id: Mapped[int | None] = mapped_column(
         ForeignKey("bank.id", ondelete="CASCADE"), init=False
     )
     office_id: Mapped[int | None] = mapped_column(
@@ -111,14 +111,16 @@ class CreditAccount(WithPK):
     mounthly_payment: Mapped[int]
     interest_rate: Mapped[int]
 
-    user_id: Mapped[int] = mapped_column(
+    user_id: Mapped[int | None] = mapped_column(
         ForeignKey("user.id", ondelete="CASCADE"), init=False
     )
-    bank_id: Mapped[int] = mapped_column(
+    bank_id: Mapped[int | None] = mapped_column(
         ForeignKey("bank.id", ondelete="CASCADE"), init=False
     )
-    employee_id: Mapped[int] = mapped_column(ForeignKey("employee.id"), init=False)
-    payment_account_id: Mapped[int] = mapped_column(
+    employee_id: Mapped[int | None] = mapped_column(
+        ForeignKey("employee.id"), init=False
+    )
+    payment_account_id: Mapped[int | None] = mapped_column(
         ForeignKey("payment_account.id"), init=False
     )
     user: Mapped["User | None"] = relationship(

@@ -1,189 +1,152 @@
-from typing import Iterable
+from functools import cached_property
+from typing import Any, Iterable
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from advanced_alchemy.service import SQLAlchemyAsyncRepositoryService
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.strategy_options import _AbstractLoad
 
-from src.models.base import Base
-from src.models.models import Bank, User, BankOffice
+from src.models import models
+from src.repositories import repositories
 from src.schemas import schemas as request_schemas
+from src.services import exceptions
 
 
-async def _update[TModel: Base](session: AsyncSession, model: TModel, **attrs):
-    for key, value in attrs.items():
-        if hasattr(model, key):
-            setattr(session, key, value)
+class BankService(SQLAlchemyAsyncRepositoryService[models.Bank]):  # type: ignore
+    repository_type = repositories.BankRepository
 
-
-class BankService:
-    def __init__(self, session: AsyncSession):
-        self._session = session
-
-    async def get(self, name: str) -> Bank | None:
-        stmt = (
-            select(Bank)
-            .where(Bank.name == name)
-            .options(
-                selectinload(Bank.users),
-                selectinload(Bank.offices),
-                selectinload(Bank.atms),
-                selectinload(Bank.employees),
-            )
-        )
-        return (await self._session.execute(stmt)).scalar_one_or_none()
-
-    async def get_many(self, *names: str) -> Iterable[Bank]:
-        stmt = (
-            select(Bank)
-            .where(Bank.name.in_(names))
-            .options(
-                selectinload(Bank.users),
-                selectinload(Bank.offices),
-                selectinload(Bank.atms),
-                selectinload(Bank.employees),
-            )
-        )
-        return await self._session.scalars(stmt)
-
-    async def all(self) -> Iterable[Bank]:
-        return await self._session.scalars(
-            select(Bank).options(
-                selectinload(Bank.users),
-                selectinload(Bank.offices),
-                selectinload(Bank.atms),
-                selectinload(Bank.employees),
-            )
+    @cached_property
+    def _all_loads(self) -> tuple[_AbstractLoad, ...]:
+        return (
+            selectinload(models.Bank.users),
+            selectinload(models.Bank.employees),
+            selectinload(models.Bank.offices),
+            selectinload(models.Bank.atms),
         )
 
-    async def create(self, schema: request_schemas.BankCreate):
-        found = await self.get(schema.name)
+    async def get_by_id(self, pk) -> models.Bank:
+        return await super().get(pk, load=self._all_loads)
+
+    async def get_by_name(self, name: str) -> models.Bank:
+        return await self.get_one(
+            models.Bank.name == name,
+            load=self._all_loads,
+        )
+
+    async def list(self) -> Iterable[models.Bank]:
+        return await super().list(load=self._all_loads)
+
+    async def create(self, schema: request_schemas.BankCreate) -> models.Bank:
+        found = await self.exists(models.Bank.name == schema.name)
         if found:
-            return
-
-        self._session.add(Bank(name=schema.name))
-        await self._session.commit()
-
-    async def delete(self, name: str) -> Bank | None:
-        found = await self.get(name)
-        if not found:
-            return None
-        await self._session.delete(found)
-        await self._session.commit()
-        return found
-
-    async def update(self, schema: request_schemas.BankUpdate) -> Bank | None:
-        found = await self.get(schema.name)
-        if not found:
-            return
-        found.name = schema.new_name
-        await self._session.commit()
-        return found
-
-
-class UserService:
-    def __init__(self, session: AsyncSession, bank_service: BankService):
-        self._session = session
-        self._bank_service = bank_service
-
-    async def get(self, pk: int) -> User | None:
-        stmt = (
-            select(User)
-            .where(User.id == pk)
-            .options(
-                selectinload(User.banks),
-                selectinload(User.payment_accounts),
-                selectinload(User.credit_accounts),
+            raise exceptions.AlreadyExistsError(
+                f"bank with {schema.name=} already exists"
             )
-        )
-        return (await self._session.execute(stmt)).scalar_one_or_none()
+        return await super().create(schema.model_dump(), auto_commit=True)
 
-    async def all(self) -> Iterable[User]:
-        return await self._session.scalars(
-            select(User).options(
-                selectinload(User.banks),
-                selectinload(User.payment_accounts),
-                selectinload(User.credit_accounts),
-            )
-        )
+    async def delete_by_id(self, pk) -> models.Bank:
+        return await super().delete(pk, load=self._all_loads, auto_commit=True)
 
-    async def create(self, schema: request_schemas.UserCreate):
-        self._session.add(User(**schema.model_dump()))
-        await self._session.commit()
+    async def delete_by_name(self, name: str) -> models.Bank:
+        bank = await self.get_by_name(name)
+        await self.repository.session.delete(bank)
+        await self.repository.session.commit()
+        return bank
 
-    async def delete(self, pk: int) -> User | None:
-        found = await self.get(pk)
-        if not found:
-            return
-        await self._session.delete(found)
-        await self._session.commit()
-        return found
-
-    async def update(self, pk: int, **attrs) -> User | None:
-        found = await self.get(pk)
-        if not found:
-            return
-        await _update(self._session, found, **attrs)
-        await self._session.commit()
-        return found
-
-    async def connect_banks(self, schema: request_schemas.ConnectUserToBanks):
-        banks = list(await self._bank_service.get_many(*schema.names))
-        if len(banks) != len(schema.names):
-            raise ValueError("not all bank exist")
-
-        user = await self.get(schema.id)
-        if user is None:
-            raise ValueError("user not found")
-
-        user.banks.extend(banks)
-        await self._session.commit()
-
-
-class BankOfficeService:
-    def __init__(self, session: AsyncSession, bank_service: BankService):
-        self._session = session
-        self._bank_service = bank_service
-
-    async def get(self, pk: int) -> BankOffice | None:
-        stmt = (
-            select(BankOffice)
-            .where(BankOffice.id == pk)
-            .options(
-                selectinload(BankOffice.bank),
-                selectinload(BankOffice.atms),
-            )
-        )
-        return (await self._session.execute(stmt)).scalar_one_or_none()
-
-    async def all(self) -> Iterable[BankOffice]:
-        return await self._session.scalars(
-            select(BankOffice).options(
-                selectinload(BankOffice.bank),
-                selectinload(BankOffice.atms),
-            )
+    async def update_by_id(self, schema: request_schemas.BankUpdateById) -> models.Bank:
+        return await super().update(
+            {"name": schema.new_name},
+            schema.id,
+            auto_commit=True,
         )
 
-    async def create(self, schema: request_schemas.BankOfficeCreate):
-        owner = await self._bank_service.get(schema.owner)
-        if owner is None:
-            raise ValueError("Owner not found")
-        self._session.add(
-            BankOffice(bank=owner, name=schema.name, rental=schema.rental)
+    async def update_by_name(
+        self, schema: request_schemas.BankUpdateByName
+    ) -> models.Bank:
+        bank = await self.get_by_name(schema.name)
+        bank.name = schema.new_name
+        await self.repository.session.commit()
+        return bank
+
+
+class BankOfficeService(SQLAlchemyAsyncRepositoryService[models.BankOffice]):  # type: ignore
+    repository_type = repositories.BankOfficeRepository
+
+    async def partial_update(self, pk, **attrs) -> models.BankOffice:
+        bank_office = await self.get(pk, load="*")
+        for k, v in attrs.items():
+            if hasattr(bank_office, k):
+                setattr(bank_office, k, v)
+        await self.repository.session.commit()
+        return bank_office
+
+
+class UserService(SQLAlchemyAsyncRepositoryService[models.User]):  # type: ignore
+    repository_type = repositories.UserRepository
+
+    async def partial_update(self, pk: Any, **attrs) -> models.User:
+        user = await self.get(pk, load="*")
+        for k, v in attrs.items():
+            if hasattr(user, k):
+                setattr(user, k, v)
+        await self.repository.session.commit()
+        return user
+
+
+class EmployeeService(SQLAlchemyAsyncRepositoryService[models.Employee]):  # type: ignore
+    repository_type = repositories.EmployeeRepository
+
+    async def partial_update(self, pk: Any, **attrs) -> models.Employee:
+        employee = await self.get(pk, load="*")
+        for k, v in attrs.items():
+            if hasattr(employee, k):
+                setattr(employee, k, v)
+        await self.repository.session.commit()
+        return employee
+
+
+class CreditAccountService(SQLAlchemyAsyncRepositoryService[models.CreditAccount]):  # type: ignore
+    repository_type = repositories.CreditAccountRepository
+
+    @cached_property
+    def _all_loads(self) -> tuple[_AbstractLoad, ...]:
+        return (
+            selectinload(models.CreditAccount.payment_account),
+            selectinload(models.CreditAccount.bank),
+            selectinload(models.CreditAccount.employee),
+            selectinload(models.CreditAccount.user),
         )
-        await self._session.commit()
 
-    async def delete(self, pk: int) -> BankOffice | None:
-        found = await self.get(pk)
-        if not found:
-            return
-        await self._session.delete(found)
-        await self._session.commit()
-        return found
+    async def list(self) -> Iterable[models.CreditAccount]:
+        return await super().list(load=self._all_loads)
 
-    async def update(self, pk: int, **attrs) -> BankOffice | None:
-        found = await self.get(pk)
-        if not found:
-            return
-        await _update(self._session, found, **attrs)
-        await self._session.commit()
-        return found
+    async def partial_update(self, pk: Any, **attrs) -> models.CreditAccount:
+        m = await self.get(pk, load="*")
+        for k, v in attrs.items():
+            if hasattr(m, k):
+                setattr(m, k, v)
+        await self.repository.session.commit()
+        return m
+
+
+class PaymentAccountService(SQLAlchemyAsyncRepositoryService[models.PaymentAccount]):  # type: ignore
+    repository_type = repositories.PaymentAccountRepository
+
+    async def partial_update(self, pk: Any, **attrs) -> models.PaymentAccount:
+        m = await self.get(pk, load="*")
+        for k, v in attrs.items():
+            if hasattr(m, k):
+                setattr(m, k, v)
+        await self.repository.session.commit()
+        return m
+
+
+class BankAtmService(SQLAlchemyAsyncRepositoryService[models.BankAtm]):  # type: ignore
+    repository_type = repositories.BankAtmRepository
+
+    async def partial_update(self, pk: Any, **attrs) -> models.BankAtm:
+        m = await self.get(pk, load="*")
+        for k, v in attrs.items():
+            if hasattr(m, k):
+                setattr(m, k, v)
+        await self.repository.session.commit()
+        return m

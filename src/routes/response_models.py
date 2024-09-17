@@ -66,10 +66,10 @@ class CreditAccount(BaseModel):
 
 class CreditAccountDetail(CreditAccount):
     model_config = ConfigDict(from_attributes=True)
-    user: "User| None"
-    bank: "Bank| None"
-    employee: "Employee| None"
-    payment_account: "PaymentAccount| None"
+    user: User | None
+    bank: Bank | None
+    employee: Employee | None
+    payment_account: "PaymentAccount | None"
 
 
 class PaymentAccount(BaseModel):

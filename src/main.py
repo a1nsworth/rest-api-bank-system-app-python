@@ -5,7 +5,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src import providers as main_providers
-from src.routes.routes import bank_route, office_route, user_route
+from src.repositories.providers import RepositoryProvider
+from src.routes import routes as handlers
 from src.services.providers import ServiceProvider
 
 
@@ -24,14 +25,23 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    app.include_router(bank_route)
-    app.include_router(office_route)
-    app.include_router(user_route)
+    routes = (
+        handlers.bank_route,
+        handlers.bank_office_route,
+        handlers.bank_atm_route,
+        handlers.employee_route,
+        handlers.user_route,
+        handlers.credit_account_route,
+        handlers.payment_account_route,
+    )
+    for route in routes:
+        app.include_router(route)
 
     container = make_async_container(
         main_providers.DbSettingProvider(),
         main_providers.AsyncDatabaseProvider(),
         ServiceProvider(),
+        RepositoryProvider(),
     )
     setup_dishka(container, app)
     return app
