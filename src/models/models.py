@@ -1,11 +1,11 @@
 import random
+from datetime import date
 from enum import Flag, auto
 
 from sqlalchemy import (
     String,
     ForeignKey,
     Enum,
-    Date,
     PrimaryKeyConstraint,
 )
 from sqlalchemy.orm import (
@@ -104,31 +104,27 @@ class Employee(WithPK, PersonModel):
 
 
 class CreditAccount(WithPK):
-    loan_start_date = mapped_column(Date)
-    loan_end_date = mapped_column(Date)
+    loan_start_date: Mapped[date]
+    loan_end_date: Mapped[date]
     load_duration_mounts: Mapped[int]
     loan_amount: Mapped[int]
     mounthly_payment: Mapped[int]
     interest_rate: Mapped[int]
 
-    user_id: Mapped[int | None] = mapped_column(
-        ForeignKey("user.id", ondelete="CASCADE"), init=False
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"),
     )
-    bank_id: Mapped[int | None] = mapped_column(
-        ForeignKey("bank.id", ondelete="CASCADE"), init=False
-    )
-    employee_id: Mapped[int | None] = mapped_column(
-        ForeignKey("employee.id"), init=False
-    )
-    payment_account_id: Mapped[int | None] = mapped_column(
-        ForeignKey("payment_account.id"), init=False
+    bank_id: Mapped[int] = mapped_column(ForeignKey("bank.id", ondelete="CASCADE"))
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employee.id"))
+    payment_account_id: Mapped[int] = mapped_column(
+        ForeignKey("payment_account.id"),
     )
     user: Mapped["User | None"] = relationship(
-        back_populates="credit_accounts", default=None
+        back_populates="credit_accounts", init=False
     )
-    bank: Mapped["Bank | None"] = relationship(default=None)
-    employee: Mapped["Employee | None"] = relationship(default=None)
-    payment_account: Mapped["PaymentAccount | None"] = relationship(default=None)
+    bank: Mapped["Bank | None"] = relationship(init=False)
+    employee: Mapped["Employee | None"] = relationship(init=False)
+    payment_account: Mapped["PaymentAccount | None"] = relationship(init=False)
 
 
 class PaymentAccount(WithPK):
@@ -137,9 +133,9 @@ class PaymentAccount(WithPK):
     user_id: Mapped[int] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"))
     bank_id: Mapped[int] = mapped_column(ForeignKey("bank.id", ondelete="CASCADE"))
     user: Mapped["User | None"] = relationship(
-        back_populates="payment_accounts", default=None
+        back_populates="payment_accounts", init=False
     )
-    bank: Mapped["Bank | None"] = relationship(default=None)
+    bank: Mapped["Bank | None"] = relationship(init=False)
 
 
 class BankAtmStatus(Flag):
@@ -153,16 +149,14 @@ class BankAtm(WithPK):
     name: Mapped[str] = mapped_column(String(50))
     amortization: Mapped[int]
 
-    bank_id: Mapped[int | None] = mapped_column(
-        ForeignKey("bank.id", ondelete="CASCADE"), init=False
-    )
+    bank_id: Mapped[int] = mapped_column(ForeignKey("bank.id", ondelete="CASCADE"))
     office_id: Mapped[int] = mapped_column(
-        ForeignKey("bank_office.id", ondelete="CASCADE"), init=False
+        ForeignKey("bank_office.id", ondelete="CASCADE")
     )
     office: Mapped["BankOffice | None"] = relationship(
-        back_populates="atms", default=None
+        back_populates="atms", init=False
     )
-    bank: Mapped["Bank | None"] = relationship(back_populates="atms", default=None)
+    bank: Mapped["Bank | None"] = relationship(back_populates="atms", init=False)
 
     status: Mapped[BankAtmStatus | None] = mapped_column(
         Enum(BankAtmStatus), default=None

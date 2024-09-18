@@ -50,8 +50,8 @@ class Employee(PersonModel):
 
 class EmployeeDetail(Employee):
     model_config = ConfigDict(from_attributes=True)
-    bank: "Bank| None"
-    office: "BankOffice| None"
+    bank: "Bank | None"
+    office: "BankOffice | None"
 
 
 class CreditAccount(BaseModel):
@@ -76,6 +76,9 @@ class PaymentAccount(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     balance: int
 
+    user_id: int
+    bank_id: int
+
 
 class PaymentAccountDetail(PaymentAccount):
     model_config = ConfigDict(from_attributes=True)
@@ -92,8 +95,8 @@ class BankAtm(BaseModel):
 
 class BankAtmDetail(BankAtm):
     model_config = ConfigDict(from_attributes=True)
-    office: "BankOffice| None"
-    bank: "Bank| None"
+    office: "BankOffice | None"
+    bank: "Bank | None"
 
 
 class BankOffice(BaseModel):

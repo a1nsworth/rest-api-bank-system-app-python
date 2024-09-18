@@ -3,7 +3,7 @@ from datetime import date
 from pydantic import BaseModel
 from pydantic.fields import Field
 
-from src.models.models import BankOfficeStatus
+from src.models.models import BankOfficeStatus, BankAtmStatus
 
 
 class PersonModel(BaseModel):
@@ -74,8 +74,15 @@ class CreditAccountCreate(BaseModel):
     mounthly_payment: int
     interest_rate: int
 
+    user_id: int
+    bank_id: int
+    payment_account_id: int
+    employee_id: int
+
 
 class CreditAccountPartialUpdate(BaseModel):
+    id: int
+
     loan_start_date: date | None = None
     loan_end_date: date | None = None
     load_duration_mounts: int | None = None
@@ -87,6 +94,9 @@ class CreditAccountPartialUpdate(BaseModel):
 class PaymentAccountCreate(BaseModel):
     balance: int
 
+    user_id: int
+    bank_id: int
+
 
 class PaymentAccountPartialUpdate(BaseModel):
     balance: int | None = None
@@ -95,8 +105,16 @@ class PaymentAccountPartialUpdate(BaseModel):
 class BankAtmCreate(BaseModel):
     name: str
     amortization: int
+    status: BankAtmStatus | None = None
+
+    office_id: int
+    bank_id: int
 
 
 class BankAtmPartialUpdate(BaseModel):
     name: str | None = None
     amortization: int | None = None
+    status: BankAtmStatus | None = None
+
+    office_id: int | None = None
+    bank_id: int | None = None

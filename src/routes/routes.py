@@ -5,7 +5,6 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter, HTTPException
 from starlette import status
 
-from src.models.models import CreditAccount
 from src.routes import response_models
 from src.schemas import schemas as request_schemas
 from src.services import exceptions as services_exceptions
@@ -380,8 +379,6 @@ async def create_credit_account(
     service: FromDishka[services.CreditAccountService],
     schema: request_schemas.CreditAccountCreate,
 ):
-    print(*schema.model_dump().values())
-    a = CreditAccount()
     return await service.create(schema.model_dump(), auto_commit=True)
 
 
